@@ -28,17 +28,27 @@ func main() {
 	}
 	defer client.Disconnect(context.TODO())
 
-	//begin findOne
+	//begin InsertOne
 	coll := client.Database("users").Collection("subscriptions")
 
-	doc := bson.D{{"chat_id", "5708402489"}, {"lat", 29.08}, {"lon", 48.05}}
+	subscription := Subscription{
+		ChatId: "5708402489",
+		Lat:    29.08,
+		Lon:    48.05,
+	}
 
-	result, err := coll.InsertOne(context.TODO(), doc)
+	result, err := coll.InsertOne(context.TODO(), subscription)
 
 	if err != nil {
 		log.Fatal(err)
 	}
 	fmt.Println(result.InsertedID, "id of inserted doc")
+
+	//begin FindOne
+	var res Subscription
+	filter := bson.D{{"chat_id", "5708402489"}}
+	err = coll.FindOne(context.TODO(), filter).Decode(&res)
+	fmt.Println("Found one item", res)
 
 	select {}
 
