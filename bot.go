@@ -87,7 +87,7 @@ func (tg *TGWeatherAPI) ParseMessage(ctx context.Context, message Message) (url.
 	case "":
 		if message.Location != nil {
 			tg.Subscribe(ctx, message)
-			q.Add("text", "you will be added to our subscription service, please select time in millitary format: HH:MM")
+			q.Add("text", "Please select  UTC time for weather updates in millitary format[0-24hr]: HH:MM")
 			q.Add("parse_mode", "HTML")
 			q.Add("reply_to_message_id", strconv.Itoa(message.Id))
 		}
@@ -99,6 +99,7 @@ func (tg *TGWeatherAPI) ParseMessage(ctx context.Context, message Message) (url.
 			q.Add("text", `I didn't understand. For help type:/help`)
 		} else {
 			tg.UpsertTime(ctx, message.Chat.Id, num)
+			q.Add("text", "your time for updates recorded successfully")
 		}
 	}
 
@@ -108,6 +109,8 @@ func (tg *TGWeatherAPI) ParseMessage(ctx context.Context, message Message) (url.
 
 //AddSubscription adds subscription from the Message
 func (tg *TGWeatherAPI) Subscribe(ctx context.Context, msg Message) error {
+	tg.log.Trace().Msg("started")
+	defer tg.log.Trace().Msg("exited")
 
 	sub := Subscription{
 		ChatId: msg.Chat.Id,
@@ -120,6 +123,8 @@ func (tg *TGWeatherAPI) Subscribe(ctx context.Context, msg Message) error {
 }
 
 func (tg *TGWeatherAPI) Unsubscribe(ctx context.Context, chatId int) error {
+	tg.log.Trace().Msg("started")
+	defer tg.log.Trace().Msg("exited")
 	filter := bson.D{{"chat_id", chatId}}
 	sub, err := tg.db.FindOne(ctx, filter)
 	if err != nil {
@@ -134,6 +139,8 @@ func (tg *TGWeatherAPI) Unsubscribe(ctx context.Context, chatId int) error {
 }
 
 func (tg *TGWeatherAPI) UpsertTime(ctx context.Context, chatId int, time int) {
+	tg.log.Trace().Msg("started")
+	defer tg.log.Trace().Msg("exited")
 	filter := bson.D{{"chat_id", chatId}}
 	sub, err := tg.db.FindOne(ctx, filter)
 	if err != nil {
@@ -151,6 +158,8 @@ func (tg *TGWeatherAPI) UpsertTime(ctx context.Context, chatId int, time int) {
 
 //send request with url parameters to TG
 func (tg *TGWeatherAPI) sendMessage(method string, q url.Values) ([]byte, error) {
+	tg.log.Trace().Msg("started")
+	defer tg.log.Trace().Msg("exited")
 
 	u, err := url.Parse(tg.endpoint)
 	if err != nil {
@@ -235,6 +244,7 @@ func (tg *TGWeatherAPI) sendWeatherUpdates(subs []Subscription) {
 		if err != nil {
 			tg.log.Error().Err(err).Send()
 		}
+		tg.log.Info().Str("update weather", fmt.Sprintf("%+v", upd))
 		text := markdownWeatherReply(*upd)
 		q := url.Values{}
 		q.Add("chat_id", strconv.Itoa(sub.ChatId))
@@ -247,6 +257,8 @@ func (tg *TGWeatherAPI) sendWeatherUpdates(subs []Subscription) {
 }
 
 func (tg *TGWeatherAPI) getSubscriptions(ctx context.Context, update int) []Subscription {
+	tg.log.Trace().Msg("started")
+	defer tg.log.Trace().Msg("exited")
 	filter := bson.D{{"update_time", update}}
 
 	subs, err := tg.db.Find(ctx, filter)
@@ -258,6 +270,7 @@ func (tg *TGWeatherAPI) getSubscriptions(ctx context.Context, update int) []Subs
 }
 
 func (b *TGWeatherAPI) doWeatherRequest(sub Subscription) (*WeatherUpdate, error) {
+
 	b.log.Trace().Msg("doWeatherRequest started")
 	defer b.log.Trace().Msg("doWeatherRequest exited")
 
