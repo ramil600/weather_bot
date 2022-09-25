@@ -10,10 +10,20 @@ import (
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
+	"go.mongodb.org/mongo-driver/mongo/readpref"
 )
 
 type DbClient struct {
-	Coll *mongo.Collection
+	Coll   *mongo.Collection
+	Client *mongo.Client
+}
+
+type Subscription struct {
+	ID         primitive.ObjectID `bson:"_id,omitempty"`
+	ChatId     int                `bson:"chat_id"`
+	Lon        float64            `bson:"lon,required"`
+	Lat        float64            `bson:"lat,required"`
+	UpdateTime int                `bson:"update_time"`
 }
 
 func NewDbClient(cfg Config, log *zerolog.Logger) *DbClient {
@@ -25,11 +35,19 @@ func NewDbClient(cfg Config, log *zerolog.Logger) *DbClient {
 	if err != nil {
 		log.Fatal()
 	}
+	if err := client.Ping(ctx, readpref.Primary()); err != nil {
+		log.Fatal().Err(err).Send()
+	}
 	coll := client.Database(cfg.Db).Collection(cfg.Collection)
 
 	return &DbClient{
-		Coll: coll,
+		Client: client,
+		Coll:   coll,
 	}
+
+}
+func (db *DbClient) Disconnect(ctx context.Context) error {
+	return db.Client.Disconnect(ctx)
 
 }
 
@@ -46,10 +64,23 @@ func (db *DbClient) InsertOne(ctx context.Context, ins Subscription) (primitive.
 
 }
 
-func (db *DbClient) FindOne(ctx context.Context, id primitive.ObjectID) (Subscription, error) {
+func (db *DbClient) UpsertOne(ctx context.Context, ins Subscription) (*mongo.UpdateResult, error) {
+
+	filter := bson.D{{"chat_id", ins.ChatId}}
+	update := bson.D{{"$set", bson.D{{"chat_id", ins.ChatId}, {"lat", ins.Lat}, {"lon", ins.Lon},
+		{"update_time", ins.UpdateTime}}}}
+	opts := options.Update().SetUpsert(true)
+	result, err := db.Coll.UpdateOne(ctx, filter, update, opts)
+	if err != nil {
+		return nil, fmt.Errorf("couldn't update subescription: %w", err)
+	}
+	return result, nil
+
+}
+
+func (db *DbClient) FindOne(ctx context.Context, filter bson.D) (Subscription, error) {
 
 	var res Subscription
-	filter := bson.D{{"_id", id}}
 
 	err := db.Coll.FindOne(ctx, filter).Decode(&res)
 	if err == mongo.ErrNoDocuments {
@@ -57,6 +88,29 @@ func (db *DbClient) FindOne(ctx context.Context, id primitive.ObjectID) (Subscri
 
 	} else if err != nil {
 		return Subscription{}, err
+	}
+
+	return res, nil
+
+}
+
+func (db *DbClient) Find(ctx context.Context, filter bson.D) ([]Subscription, error) {
+
+	var res []Subscription
+
+	cursor, err := db.Coll.Find(ctx, filter)
+	if err != nil {
+		return nil, fmt.Errorf("error finding elements: %w", err)
+	}
+
+	defer cursor.Close(ctx)
+
+	if err := cursor.All(ctx, &res); err != nil {
+		return nil, fmt.Errorf("error exctrating elements from cursor: %w", err)
+	}
+
+	if err := cursor.Err(); err != nil {
+		return nil, fmt.Errorf("error given when finding elements: %w", err)
 	}
 
 	return res, nil
@@ -86,6 +140,6 @@ func (db *DbClient) DeleteOne(ctx context.Context, id primitive.ObjectID) error 
 	}
 	if del.DeletedCount == 0 {
 		return fmt.Errorf("no record to delete")
-
 	}
+	return nil
 }

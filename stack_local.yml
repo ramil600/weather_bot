@@ -6,7 +6,7 @@ services:
     image: mongo
     restart: always
     ports:
-      - "8000:8000"
+      - "27017:27017"
     environment:
       MONGO_INITDB_ROOT_USERNAME: root
       MONGO_INITDB_ROOT_PASSWORD: example
@@ -23,10 +23,6 @@ services:
       ME_CONFIG_MONGODB_ADMINPASSWORD: example
       ME_CONFIG_MONGODB_URL: mongodb://root:example@mongo:27017/
   
-  mainservice:
-    build: .
-    image: main:latest
-    env_file: .env
   
 volumes:
   data-volume:

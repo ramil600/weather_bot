@@ -1,6 +1,10 @@
 package main
 
 type Config struct {
+	//Telegram
+	Host  string `env:"HOST"`
+	Token string `env:"TOKEN"`
+
 	DbHost     string `env:"MONGODB_URI"`
 	Collection string `env:"COLLECTION"`
 	Db         string `env:"DB"`

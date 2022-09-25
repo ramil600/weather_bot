@@ -7,3 +7,5 @@
 
 
 %docker-compose -f stack.yml up
+
+To interact with  mongo through web browser: http://localhost:8081/
